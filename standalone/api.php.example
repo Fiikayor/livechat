@@ -1,12 +1,15 @@
 <?php
-// standalone/api.php  -- the ENTIRE standalone "controller" (~15 lines)
+// Entry point for the standalone version. All API requests end up here.
 require __DIR__ . '/vendor/autoload.php';
 
 use LiveChat\Core\Http\{ApiRouter, Request};
 
-$app = require __DIR__ . '/bootstrap.php';   // wires PdoStorage, MailNotifier, PollingTransport...
+// bootstrap.php doesn't exist yet. It'll set up the DB, mailer, etc.
+$app = require __DIR__ . '/bootstrap.php';
 
+// strip the base url so the router just sees "/messages", "/config", etc.
 $path = '/' . ltrim(substr(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), strlen('/livechat/api/v1')), '/');
+
 $response = $app->get(ApiRouter::class)->handle(new Request(
     method:  $_SERVER['REQUEST_METHOD'],
     path:    $path,

@@ -1,20 +1,21 @@
 <?php
 declare(strict_types=1);
+
 namespace LiveChat\Core\Domain;
 
 final class Message
 {
     public const FROM_VISITOR = 'visitor';
     public const FROM_AGENT = 'agent';
-    public const FROM_SYSTEM = 'system';
+    public const FROM_SYSTEM = 'system';   // not used yet, for "chat closed" style notes
 
     public function __construct(
         public readonly int $id,
         public readonly int $conversationId,
         public readonly string $senderType,
         public readonly ?int $agentId,
-        public readonly string $body,               // stored RAW; escape on output (widget uses textContent)
-        public readonly ?string $clientId,          // client-generated id for idempotent retries
+        public readonly string $body,         // raw text, escape when you render it
+        public readonly ?string $clientId,    // lets us ignore retried sends
         public readonly \DateTimeImmutable $createdAt,
     ) {}
 

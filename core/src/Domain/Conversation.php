@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+
 namespace LiveChat\Core\Domain;
 
 final class Conversation
@@ -10,7 +11,7 @@ final class Conversation
     public function __construct(
         public readonly int $id,
         public readonly string $status,
-        public readonly array $visitorMeta,          // name, email, page url, user agent...
+        public readonly array $visitorMeta,   // name, email, page url, etc
         public readonly ?int $assignedAgentId,
         public readonly \DateTimeImmutable $createdAt,
         public readonly \DateTimeImmutable $lastActivityAt,

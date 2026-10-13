@@ -1,5 +1,4 @@
 <?php
-// laravel/src/Http/LiveChatController.php  -- the ENTIRE Laravel "controller"
 namespace YourName\LiveChat\Http;
 
 use Illuminate\Http\Request as LaravelRequest;
@@ -14,11 +13,14 @@ class LiveChatController
             path:    '/' . $path,
             query:   $r->query(),
             body:    $r->json()->all(),
+            // laravel gives headers as arrays, we only want the first value
             headers: array_map(fn ($v) => $v[0], array_change_key_case($r->headers->all(), CASE_LOWER)),
             ip:      $r->ip(),
         ));
+
         return response()->json($res->data, $res->status);
     }
 }
-// Route:  Route::any('livechat/api/v1/{path?}', LiveChatController::class)->where('path', '.*');
-// ServiceProvider binds: StorageInterface => EloquentStorage, NotifierInterface => LaravelNotifier, etc.
+
+// Route::any('livechat/api/v1/{path?}', LiveChatController::class)->where('path', '.*');
+// the service provider (not written yet) binds EloquentStorage, Laravel mail, etc.

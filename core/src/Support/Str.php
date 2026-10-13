@@ -1,8 +1,11 @@
 <?php
+
 declare(strict_types=1);
+
 namespace LiveChat\Core\Support;
 
-/** UTF-8 helpers that work even when ext-mbstring is missing (common on cheap shared hosts). */
+// mbstring isn't enabled on every cheap host, so fall back to regex
+// instead of crashing.
 final class Str
 {
     public static function len(string $s): int

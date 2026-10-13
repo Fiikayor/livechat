@@ -1,12 +1,14 @@
 <?php
 declare(strict_types=1);
+
 namespace LiveChat\Core\Service;
 
 use LiveChat\Core\Contracts\{NotifierInterface, RateLimiterInterface, StorageInterface, TransportInterface};
 use LiveChat\Core\Domain\{Agent, Conversation, Message};
 use LiveChat\Core\Support\{ChatException, Str, Token};
 
-/** All business rules live here. No HTTP, no framework, no SQL. */
+// All the chat rules live here. No SQL and no HTTP in this file,
+// it only talks to the interfaces.
 final class ChatService
 {
     public function __construct(
@@ -17,7 +19,7 @@ final class ChatService
         private int $maxBodyLength = 2000,
     ) {}
 
-    /** @return array{0: Conversation, 1: string} conversation + PLAIN visitor token (shown once) */
+    /** @return array{0: Conversation, 1: string} the conversation and the plain token */
     public function startConversation(array $meta, string $ip): array
     {
         $this->throttle("start:$ip", 5, 600);
@@ -27,26 +29,37 @@ final class ChatService
             Token::hash($token),
             $this->cleanMeta($meta)
         );
+
         return [$conversation, $token];
     }
 
     public function visitorSend(string $token, string $body, ?string $clientId, string $ip): Message
     {
         $this->throttle("msg:$ip", 30, 60);
+
         $conversation = $this->conversationForToken($token);
         if ($conversation->status === Conversation::CLOSED) {
             throw new ChatException('conversation_closed', 'This conversation is closed.', 409);
         }
 
+        // retry from a flaky connection: already saved, so don't
+        // broadcast or notify a second time
         if ($clientId !== null && ($dup = $this->storage->findMessageByClientId($conversation->id, $clientId))) {
-            return $dup;   // retry: already stored, don't re-broadcast or re-notify
+            return $dup;
         }
+
         $message = $this->storage->addMessage(
-            $conversation->id, Message::FROM_VISITOR, null, $this->cleanBody($body), $clientId
+            $conversation->id,
+            Message::FROM_VISITOR,
+            null,
+            $this->cleanBody($body),
+            $clientId
         );
+
         $this->transport->publish("conversation.{$conversation->id}", 'message', $message->toArray());
         $this->transport->publish('agents', 'message', $message->toArray());
         $this->notifier->newVisitorMessage($conversation, $message);
+
         return $message;
     }
 
@@ -58,10 +71,17 @@ final class ChatService
         if ($clientId !== null && ($dup = $this->storage->findMessageByClientId($conversation->id, $clientId))) {
             return $dup;
         }
+
         $message = $this->storage->addMessage(
-            $conversation->id, Message::FROM_AGENT, $agent->id, $this->cleanBody($body), $clientId
+            $conversation->id,
+            Message::FROM_AGENT,
+            $agent->id,
+            $this->cleanBody($body),
+            $clientId
         );
+
         $this->transport->publish("conversation.{$conversation->id}", 'message', $message->toArray());
+
         return $message;
     }
 
@@ -70,6 +90,8 @@ final class ChatService
     {
         $conversation = $this->conversationForToken($token);
         $messages = $this->storage->messagesSince($conversation->id, $afterId);
+
+        // if nothing new, hand back the same cursor
         $next = $messages ? end($messages)->id : $afterId;
 
         return [
@@ -82,14 +104,20 @@ final class ChatService
 
     public function offlineMessage(string $name, string $email, string $body, string $ip): void
     {
+        // tight limit, this one sends real emails
         $this->throttle("offline:$ip", 3, 3600);
+
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new ChatException('invalid_email', 'Please enter a valid email address.', 422);
         }
-        $this->notifier->offlineMessage(Str::cut(trim($name), 100), $email, $this->cleanBody($body));
+
+        $this->notifier->offlineMessage(
+            Str::cut(trim($name), 100),
+            $email,
+            $this->cleanBody($body)
+        );
     }
 
-    // ---------- internals ----------
     private function conversationForToken(string $token): Conversation
     {
         return $this->storage->findConversationByTokenHash(Token::hash($token))
@@ -99,24 +127,29 @@ final class ChatService
     private function cleanBody(string $body): string
     {
         $body = trim($body);
+
         if ($body === '') {
             throw new ChatException('empty_message', 'Message cannot be empty.', 422);
         }
         if (Str::len($body) > $this->maxBodyLength) {
             throw new ChatException('message_too_long', "Max {$this->maxBodyLength} characters.", 422);
         }
+
         return $body;
     }
 
+    // only keep the fields we expect, and cap their length
     private function cleanMeta(array $meta): array
     {
         $allowed = ['name' => 100, 'email' => 150, 'page_url' => 500, 'user_agent' => 300];
         $out = [];
+
         foreach ($allowed as $key => $max) {
             if (isset($meta[$key]) && is_string($meta[$key])) {
                 $out[$key] = Str::cut(trim($meta[$key]), $max);
             }
         }
+
         return $out;
     }
 
