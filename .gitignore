@@ -1,0 +1,17 @@
+# dependencies & build output
+/vendor/
+/core/vendor/
+node_modules/
+
+# local config & data (never commit these)
+.env
+*.sqlite
+*.sqlite3
+/standalone/config.php
+/standalone/storage/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

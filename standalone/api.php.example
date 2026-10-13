@@ -1,0 +1,21 @@
+<?php
+// standalone/api.php  -- the ENTIRE standalone "controller" (~15 lines)
+require __DIR__ . '/vendor/autoload.php';
+
+use LiveChat\Core\Http\{ApiRouter, Request};
+
+$app = require __DIR__ . '/bootstrap.php';   // wires PdoStorage, MailNotifier, PollingTransport...
+
+$path = '/' . ltrim(substr(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), strlen('/livechat/api/v1')), '/');
+$response = $app->get(ApiRouter::class)->handle(new Request(
+    method:  $_SERVER['REQUEST_METHOD'],
+    path:    $path,
+    query:   $_GET,
+    body:    json_decode(file_get_contents('php://input'), true) ?? [],
+    headers: array_change_key_case(getallheaders(), CASE_LOWER),
+    ip:      $_SERVER['REMOTE_ADDR'],
+));
+
+http_response_code($response->status);
+foreach ($response->headers as $k => $v) header("$k: $v");
+echo $response->json();

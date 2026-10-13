@@ -1,0 +1,24 @@
+<?php
+// laravel/src/Http/LiveChatController.php  -- the ENTIRE Laravel "controller"
+namespace YourName\LiveChat\Http;
+
+use Illuminate\Http\Request as LaravelRequest;
+use LiveChat\Core\Http\{ApiRouter, Request};
+
+class LiveChatController
+{
+    public function __invoke(LaravelRequest $r, ApiRouter $router, string $path = '')
+    {
+        $res = $router->handle(new Request(
+            method:  $r->method(),
+            path:    '/' . $path,
+            query:   $r->query(),
+            body:    $r->json()->all(),
+            headers: array_map(fn ($v) => $v[0], array_change_key_case($r->headers->all(), CASE_LOWER)),
+            ip:      $r->ip(),
+        ));
+        return response()->json($res->data, $res->status);
+    }
+}
+// Route:  Route::any('livechat/api/v1/{path?}', LiveChatController::class)->where('path', '.*');
+// ServiceProvider binds: StorageInterface => EloquentStorage, NotifierInterface => LaravelNotifier, etc.
