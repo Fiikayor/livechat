@@ -6,17 +6,39 @@ on:
   pull_request:
 
 jobs:
-  core:
+  tests:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        php: ['8.1', '8.2', '8.3']   # core promises 8.1+, so test the floor
+        php: ['8.1', '8.2', '8.3']   # the core promises 8.1+, so test the oldest too
+
+    # throwaway MySQL for the mysql_smoke test
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: livechat_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
+          extensions: pdo_sqlite, pdo_mysql
       - name: Lint
-        run: find core -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: Smoke test
+        run: find core standalone -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Core (in-memory)
         run: php core/tests/smoke.php
+      - name: Standalone (SQLite)
+        run: php standalone/tests/pdo_smoke.php
+      - name: Standalone (MySQL)
+        run: php standalone/tests/mysql_smoke.php
+        env:
+          LIVECHAT_MYSQL_DSN: mysql:host=127.0.0.1;port=3306;dbname=livechat_test;charset=utf8mb4
+          LIVECHAT_MYSQL_USER: root
+          LIVECHAT_MYSQL_PASS: root

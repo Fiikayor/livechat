@@ -1,14 +1,18 @@
 <?php
-// Runs a full chat through the API using in-memory fakes.
-// No DB needed:  php core/tests/smoke.php
+// Runs the chat story against in-memory fakes. No DB needed:
+//   php core/tests/smoke.php
 declare(strict_types=1);
 
-spl_autoload_register(fn ($c) => is_file($f = __DIR__ . '/../src/' . str_replace(['LiveChat\\Core\\', '\\'], ['', '/'], $c) . '.php') ? require $f : null);
+spl_autoload_register(function ($class) {
+    $file = __DIR__ . '/../src/' . str_replace(['LiveChat\\Core\\', '\\'], ['', '/'], $class) . '.php';
+    if (is_file($file)) {
+        require $file;
+    }
+});
+require __DIR__ . '/story.php';
 
-use LiveChat\Core\Contracts\{AgentAuthenticatorInterface, NotifierInterface, RateLimiterInterface, StorageInterface};
+use LiveChat\Core\Contracts\{RateLimiterInterface, StorageInterface};
 use LiveChat\Core\Domain\{Agent, Conversation, Message};
-use LiveChat\Core\Http\{ApiRouter, Request};
-use LiveChat\Core\Service\{ChatService, PollingTransport};
 
 // fake storage, just arrays
 final class MemStorage implements StorageInterface
@@ -38,7 +42,7 @@ final class MemStorage implements StorageInterface
 
     public function listConversations(string $s, int $l = 50, int $o = 0): array
     {
-        return array_values($this->convs);
+        return array_values(array_filter($this->convs, fn($c) => $c->status === $s));
     }
 
     public function setConversationStatus(int $id, string $s): void
@@ -51,10 +55,8 @@ final class MemStorage implements StorageInterface
 
     public function addMessage(int $cid, string $t, ?int $a, string $b, ?string $cl = null): Message
     {
-        foreach ($this->msgs as $m) {
-            if ($cl && $m->conversationId === $cid && $m->clientId === $cl) {
-                return $m;
-            }
+        if ($cl !== null && ($m = $this->findMessageByClientId($cid, $cl))) {
+            return $m;
         }
         $id = count($this->msgs) + 1;
         return $this->msgs[$id] = new Message($id, $cid, $t, $a, $b, $cl, new DateTimeImmutable());
@@ -72,12 +74,12 @@ final class MemStorage implements StorageInterface
 
     public function messagesSince(int $cid, int $after, int $l = 100): array
     {
-        return array_values(array_filter($this->msgs, fn ($m) => $m->conversationId === $cid && $m->id > $after));
+        return array_values(array_filter($this->msgs, fn($m) => $m->conversationId === $cid && $m->id > $after));
     }
 
     public function allMessagesSince(int $after, int $l = 100): array
     {
-        return array_values(array_filter($this->msgs, fn ($m) => $m->id > $after));
+        return array_values(array_filter($this->msgs, fn($m) => $m->id > $after));
     }
 
     public function findAgent(int $id): ?Agent
@@ -101,14 +103,6 @@ final class MemStorage implements StorageInterface
     }
 }
 
-// counts how many times the team would have been alerted
-$notified = 0;
-$notifier = new class($notified) implements NotifierInterface {
-    public function __construct(private int &$n) {}
-    public function newVisitorMessage(Conversation $c, Message $m): void { $this->n++; }
-    public function offlineMessage(string $a, string $b, string $c): void {}
-};
-
 $limiter = new class implements RateLimiterInterface {
     private array $h = [];
     public function hit(string $k, int $max, int $s): bool
@@ -117,71 +111,4 @@ $limiter = new class implements RateLimiterInterface {
     }
 };
 
-// "Bearer agent" is all it takes to be logged in here
-$auth = new class implements AgentAuthenticatorInterface {
-    public function authenticate(Request $r): ?Agent
-    {
-        return $r->header('authorization') === 'Bearer agent' ? new Agent(1, 'Ada', 'ada@x.test') : null;
-    }
-};
-
-$store = new MemStorage();
-$api = new ApiRouter(
-    new ChatService($store, $notifier, new PollingTransport(), $limiter),
-    $store,
-    new PollingTransport(),
-    $auth
-);
-
-$call = fn (string $m, string $p, array $body = [], array $q = [], array $h = [])
-    => $api->handle(new Request($m, $p, $q, $body, $h, '1.2.3.4'));
-
-$ok = function (string $name, bool $cond) {
-    echo ($cond ? 'PASS' : 'FAIL') . "  $name\n";
-    if (!$cond) {
-        exit(1);
-    }
-};
-
-// visitor starts a chat
-$r = $call('POST', '/conversations', ['name' => 'Sam']);
-$ok('start conversation (201)', $r->status === 201);
-$tok = $r->data['visitor_token'];
-
-$r = $call('POST', '/messages', ['body' => 'Hi, price?', 'client_id' => 'a1'], [], ['x-chat-token' => $tok]);
-$ok('visitor sends message', $r->status === 201);
-
-// same client_id again, like a retry after a bad connection
-$call('POST', '/messages', ['body' => 'Hi, price?', 'client_id' => 'a1'], [], ['x-chat-token' => $tok]);
-$ok('retry with same client_id is idempotent', count($store->msgs) === 1);
-$ok('agent notified exactly once (retry did not re-notify)', $notified === 1);
-
-$r = $call('GET', '/agent/events');
-$ok('agent endpoint without auth -> 401', $r->status === 401);
-
-$r = $call('GET', '/agent/events', [], ['after' => 0], ['authorization' => 'Bearer agent']);
-$ok('agent sees visitor message', count($r->data['messages']) === 1);
-
-$r = $call('POST', '/agent/conversations/1/messages', ['body' => 'About $20'], [], ['authorization' => 'Bearer agent']);
-$ok('agent replies', $r->status === 201);
-
-$r = $call('GET', '/messages', [], ['after' => 0], ['x-chat-token' => $tok]);
-$ok('visitor polls both messages', count($r->data['messages']) === 2 && $r->data['agent_online'] === true);
-
-$r = $call('GET', '/messages', [], ['after' => 0], ['x-chat-token' => 'wrong']);
-$ok('wrong token -> 401', $r->status === 401);
-
-$r = $call('POST', '/messages', ['body' => str_repeat('x', 3000)], [], ['x-chat-token' => $tok]);
-$ok('too-long message -> 422', $r->status === 422);
-
-$call('POST', '/agent/conversations/1/close', [], [], ['authorization' => 'Bearer agent']);
-$r = $call('POST', '/messages', ['body' => 'still there?'], [], ['x-chat-token' => $tok]);
-$ok('closed conversation -> 409', $r->status === 409);
-
-// 6 chats from one IP, the limit is 5
-for ($i = 0; $i < 6; $i++) {
-    $r = $call('POST', '/conversations');
-}
-$ok('conversation spam rate-limited -> 429', $r->status === 429);
-
-echo "\nAll good.\n";
+livechat_run_story(new MemStorage(), $limiter);
