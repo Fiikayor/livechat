@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiveChat demo</title>
+<style>
+    body { font: 16px/1.6 system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+    button { padding: .5rem 1rem; font: inherit; }
+</style>
+</head>
+<body>
+    <h1>Pretend shop</h1>
+    <p>This is a stand-in for your website. The chat bubble should be in the bottom-right corner.</p>
+    <p><button onclick="LiveChat.open()">Open the chat from my own button</button></p>
+
+    <!-- This one line is all a site owner has to add. -->
+    <script src="/widget/livechat.js" data-api="/standalone/api.php" defer></script>
+</body>
+</html>
