@@ -175,7 +175,7 @@
     '.link{border:0;background:none;color:var(--c);text-decoration:underline;padding:0}',
     '.pre{display:flex;gap:6px;padding:8px 12px 0}.pre input{padding:6px 8px;font-size:13px}',
     '.conn{padding:12px;text-align:center;color:var(--muted);font-size:13px}',
-    '.offline{overflow-y:auto}.offline p{margin:0}.err{color:#dc2626;font-size:13px;min-height:1em}',
+    '.offline{overflow-y:auto;padding:12px}.offline p{margin:0}.err{color:#dc2626;font-size:13px;min-height:1em}',
     '@media (max-width:480px){.wrap{bottom:12px;' + cfg.side + ':12px}',
     '  .panel{position:fixed;inset:0;width:auto;height:100vh;height:100dvh;margin:0;border:0;border-radius:0;',
     '    padding-bottom:env(safe-area-inset-bottom)}.head{padding-top:calc(12px + env(safe-area-inset-top))}}',

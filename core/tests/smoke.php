@@ -82,6 +82,17 @@ final class MemStorage implements StorageInterface
         return array_values(array_filter($this->msgs, fn($m) => $m->id > $after));
     }
 
+    public function lastMessages(array $ids): array
+    {
+        $out = [];
+        foreach ($this->msgs as $m) {
+            if (in_array($m->conversationId, $ids, true)) {
+                $out[$m->conversationId] = $m;      // messages are stored oldest first, so the last one wins
+            }
+        }
+        return $out;
+    }
+
     public function findAgent(int $id): ?Agent
     {
         return new Agent(1, 'Ada', 'ada@x.test');

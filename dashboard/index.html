@@ -1,0 +1,680 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiveChat</title>
+<style>
+    :root { color-scheme: light dark; --bg:#fff; --panel:#f8fafc; --fg:#0f172a; --muted:#64748b; --line:#e2e8f0;
+            --accent:#2563eb; --on:#fff; --them:#f1f5f9; --alert:#dc2626; }
+    @media (prefers-color-scheme: dark) {
+        :root { --bg:#0f172a; --panel:#111c33; --fg:#e2e8f0; --muted:#94a3b8; --line:#243049; --them:#1e293b; }
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; margin: 0; }
+    body { font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    input, textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+    input:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    .primary { background: var(--accent); color: var(--on); border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
+    .primary:disabled { opacity: .5; cursor: not-allowed; }
+    .ghost { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; font-size: 13px; }
+    .err { color: var(--alert); min-height: 1.4em; font-size: 14px; }
+
+    /* login */
+    #login { min-height: 100%; display: grid; place-items: center; padding: 16px; }
+    .card { width: 100%; max-width: 360px; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); display: flex; flex-direction: column; gap: 10px; }
+    .card h1 { margin: 0; font-size: 22px; } .card p { margin: 0 0 6px; color: var(--muted); }
+    .card label { font-weight: 600; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
+
+    /* app */
+    #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+    #banner { background: var(--alert); color: #fff; text-align: center; padding: 6px; font-size: 14px; }
+    header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    header .spacer { flex: 1; } header #who { color: var(--muted); font-size: 14px; }
+    main { flex: 1; min-height: 0; display: grid; grid-template-columns: 340px 1fr; }
+    #side { border-right: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+    .tabs { display: flex; border-bottom: 1px solid var(--line); }
+    .tabs button { flex: 1; padding: 10px; background: none; border: 0; border-bottom: 2px solid transparent; font-weight: 600; color: var(--muted); }
+    .tabs button[aria-selected=true] { color: var(--fg); border-bottom-color: var(--accent); }
+    #list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+    #list .none { padding: 20px; color: var(--muted); text-align: center; }
+    .item { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--line); padding: 10px 14px 10px 24px; position: relative; }
+    .item:hover { background: var(--them); } .item.sel { background: var(--them); box-shadow: inset 3px 0 0 var(--accent); }
+    .item .top { display: flex; justify-content: space-between; gap: 8px; }
+    .item .nm { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .item .tm { color: var(--muted); font-size: 12px; flex: none; }
+    .item .pv { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .item.unread .nm, .item.unread .pv { font-weight: 700; color: var(--fg); }
+    .item.unread::before { content: ""; position: absolute; left: 9px; top: 50%; width: 9px; height: 9px; margin-top: -4px; border-radius: 50%; background: var(--alert); }
+
+    #thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    #empty { margin: auto; color: var(--muted); }
+    #chat { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+    .thead { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+    .thead .who { flex: 1; min-width: 0; } .thead strong { display: block; }
+    .thead small { color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .thead a { color: var(--accent); }
+    #back { display: none; }
+    #msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .row { display: flex; flex-direction: column; max-width: 75%; }
+    .row.agent { align-self: flex-end; align-items: flex-end; } .row.visitor { align-self: flex-start; }
+    .bubble { padding: 8px 12px; border-radius: 14px; background: var(--them); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .row.agent .bubble { background: var(--accent); color: var(--on); border-bottom-right-radius: 4px; }
+    .row.visitor .bubble { border-bottom-left-radius: 4px; }
+    .meta { font-size: 11px; color: var(--muted); margin: 2px 4px 0; }
+    .row.pending .bubble { opacity: .55; }
+    .row.failed .bubble { outline: 2px solid var(--alert); cursor: pointer; } .row.failed .meta { color: var(--alert); }
+    .note { align-self: center; color: var(--muted); font-size: 13px; }
+    #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); align-items: flex-end; }
+    #composer textarea { resize: none; max-height: 140px; }
+    #closedNote { padding: 14px; text-align: center; color: var(--muted); border-top: 1px solid var(--line); }
+
+    @media (max-width: 760px) {
+        main { grid-template-columns: 1fr; }
+        #thread { display: none; }
+        #app.chat-open #side { display: none; }
+        #app.chat-open #thread { display: flex; }
+        #back { display: inline-block; }
+        .row { max-width: 88%; }
+    }
+</style>
+</head>
+<body>
+
+<div id="login" hidden>
+    <form id="loginForm" class="card">
+        <h1>LiveChat</h1>
+        <p>Log in to answer your visitors.</p>
+        <label>Email <input type="email" id="email" required autocomplete="username"></label>
+        <label>Password <input type="password" id="password" required autocomplete="current-password"></label>
+        <div id="loginError" class="err" role="alert"></div>
+        <button type="submit" id="loginBtn" class="primary">Log in</button>
+    </form>
+</div>
+
+<div id="app" hidden>
+    <div id="banner" role="status" hidden>Connection problem. Retrying&hellip;</div>
+    <header>
+        <strong>LiveChat</strong>
+        <span id="who"></span>
+        <span class="spacer"></span>
+        <button id="alertsBtn" class="ghost" type="button" hidden>Desktop alerts</button>
+        <button id="soundBtn" class="ghost" type="button"></button>
+        <button id="logoutBtn" class="ghost" type="button">Log out</button>
+    </header>
+    <main>
+        <aside id="side">
+            <div class="tabs" role="tablist">
+                <button type="button" role="tab" data-tab="open" id="tabOpen">Open</button>
+                <button type="button" role="tab" data-tab="closed" id="tabClosed">Closed</button>
+            </div>
+            <ul id="list"></ul>
+        </aside>
+        <section id="thread">
+            <div id="empty">Select a conversation</div>
+            <div id="chat" hidden>
+                <div class="thead">
+                    <button id="back" class="ghost" type="button" aria-label="Back to the list">&larr;</button>
+                    <div class="who"><strong id="tname"></strong><small id="tinfo"></small></div>
+                    <button id="closeBtn" class="ghost" type="button">Close conversation</button>
+                </div>
+                <div id="msgs" aria-live="polite"></div>
+                <form id="composer">
+                    <textarea id="reply" rows="2" maxlength="2000" placeholder="Type your reply&hellip;" aria-label="Your reply"></textarea>
+                    <button type="submit" class="primary">Send</button>
+                </form>
+                <div id="closedNote" hidden>This conversation is closed.</div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- state ----------
+
+  const state = {
+    api: '', auth: '', csrf: '', agent: null,
+    tab: 'open',
+    convs: new Map(),      // id -> { id, status, visitor, last_activity_at, created_at, last }
+    threads: new Map(),    // id -> messages, oldest first
+    loading: new Set(),
+    selected: null,
+    cursor: 0,             // newest message id we've heard about
+    interval: 3000,
+    timer: null, polling: false, errors: 0,
+    read: {},              // conversation id -> newest message id this agent has seen
+    sound: true,
+    closeArmed: false,
+    threadDirty: true, listSig: '', shownFor: null,
+  };
+
+  // localStorage can be blocked, everything still works without it
+  const store = {
+    get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch (e) { return fallback; } },
+    set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* fine */ } },
+  };
+
+  function h(tag, props, kids) {
+    const e = document.createElement(tag);
+    for (const k of Object.keys(props || {})) {
+      if (k === 'class') e.className = props[k];
+      else if (k === 'text') e.textContent = props[k];      // always textContent, never innerHTML
+      else e.setAttribute(k, props[k]);
+    }
+    for (const c of kids || []) e.appendChild(c);
+    return e;
+  }
+
+  const uuid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  const nameOf = (c) => (c.visitor && c.visitor.name) || ('Visitor #' + c.id);
+  const isUnread = (c) => !!c.last && c.last.sender === 'visitor' && c.last.id > (state.read[c.id] || 0);
+  const focused = () => (typeof document.hasFocus === 'function' ? document.hasFocus() : true);
+  const selectedConv = () => state.convs.get(state.selected) || null;
+  const looking = (id) => id === state.selected && !document.hidden && focused();
+
+  function clock(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  function ago(iso) {
+    const s = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (isNaN(s)) return '';
+    if (s < 60) return 'now';
+    if (s < 3600) return Math.floor(s / 60) + 'm';
+    if (s < 86400) return Math.floor(s / 3600) + 'h';
+    return new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  }
+
+  // ---------- talking to the server ----------
+
+  async function call(method, path, body, base) {
+    const opts = { method, credentials: 'same-origin', headers: {} };
+    if (method !== 'GET' && state.csrf) opts.headers['X-CSRF-Token'] = state.csrf;
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+
+    const res = await fetch((base || state.api) + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error((data.error && data.error.message) || 'Request failed');
+      err.status = res.status;
+      err.code = data.error && data.error.code;
+      throw err;
+    }
+    return data;
+  }
+
+  // Find api.php: next to this folder when installed from a release,
+  // or in ../standalone/ in the repository layout.
+  async function detectApi() {
+    for (const rel of ['../api.php', '../standalone/api.php']) {
+      const url = new URL(rel, location.href).href;
+      try {
+        const res = await fetch(url + '/config');
+        const data = res.ok ? await res.json() : null;
+        if (data && data.transport) return url;
+      } catch (e) { /* try the next one */ }
+    }
+    throw new Error('api.php not found');
+  }
+
+  // ---------- login / logout ----------
+
+  function showLogin(message) {
+    stop();
+    state.agent = null; state.csrf = '';
+    $('app').hidden = true; $('login').hidden = false;
+    $('loginError').textContent = message || '';
+    document.title = 'LiveChat';
+  }
+
+  async function begin(me) {
+    state.agent = me.agent; state.csrf = me.csrf;
+    state.read = store.get('livechat-dash:read:' + me.agent.id, {});
+    state.sound = store.get('livechat-dash:sound', true);
+    state.convs.clear(); state.threads.clear(); state.loading.clear();
+    state.selected = null; state.errors = 0; state.listSig = ''; state.threadDirty = true;
+
+    $('login').hidden = true; $('app').hidden = false;
+    $('who').textContent = me.agent.name;
+    $('app').classList.remove('chat-open');
+    $('alertsBtn').hidden = !(window.Notification && Notification.permission === 'default');
+
+    try {
+      const cfg = await call('GET', '/config');
+      state.interval = Math.max(1000, Number(cfg.transport && cfg.transport.interval_ms) || 3000);
+    } catch (e) { /* default is fine */ }
+
+    await Promise.all([loadList('open'), loadList('closed')]);
+
+    // Start listening from "now". The newest message overall always belongs to
+    // the most recently active conversation, so it's in one of these two lists.
+    state.cursor = 0;
+    state.convs.forEach((c) => { if (c.last) state.cursor = Math.max(state.cursor, c.last.id); });
+
+    render();
+    poll();
+  }
+
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!state.auth) return;
+    ensureAudio();                      // logging in is the click browsers need before they allow sound
+    $('loginBtn').disabled = true;
+    $('loginError').textContent = '';
+    try {
+      await begin(await call('POST', '/login', { email: $('email').value.trim(), password: $('password').value }, state.auth));
+      $('password').value = '';
+    } catch (err) {
+      $('loginError').textContent = err.status ? err.message : 'Could not reach the server.';
+    }
+    $('loginBtn').disabled = false;
+  });
+
+  $('logoutBtn').addEventListener('click', async () => {
+    try { await call('POST', '/logout', null, state.auth); } catch (e) { /* logging out locally anyway */ }
+    showLogin('');
+  });
+
+  // ---------- conversations and messages ----------
+
+  async function loadList(status) {
+    const data = await call('GET', '/agent/conversations?status=' + status);
+    for (const c of data.conversations) {
+      const old = state.convs.get(c.id);
+      state.convs.set(c.id, {
+        id: c.id,
+        status: c.status,
+        visitor: Array.isArray(c.visitor) ? {} : (c.visitor || {}),    // PHP sends an empty object as []
+        created_at: c.created_at,
+        last_activity_at: c.last_activity_at,
+        last: c.last_message || (old && old.last) || null,
+      });
+    }
+  }
+
+  async function loadThread(id) {
+    if (state.loading.has(id)) return;
+    state.loading.add(id);
+    const live = [];                    // anything that arrives by polling, or that we type, while downloading
+    state.threads.set(id, live);
+
+    try {
+      const fetched = [];
+      let after = 0;
+      for (;;) {                        // the server sends 100 at a time
+        const data = await call('GET', '/agent/conversations/' + id + '/messages?after=' + after);
+        fetched.push(...data.messages);
+        if (data.messages.length < 100) break;
+        after = data.messages[data.messages.length - 1].id;
+      }
+      const byId = new Map();
+      for (const m of fetched.concat(live)) if (m.id != null) byId.set(m.id, m);
+      const unsent = live.filter((m) => m.id == null);
+      const sorted = [...byId.values()].sort((a, b) => a.id - b.id);
+      state.threads.set(id, sorted.concat(unsent));
+
+      // The download may hold messages newer than the list preview knew about.
+      // Learn from it, so polling doesn't announce them again as "new" later.
+      const c = state.convs.get(id), newest = sorted[sorted.length - 1];
+      if (c && newest && (!c.last || newest.id > c.last.id)) { c.last = newest; c.last_activity_at = newest.created_at; }
+    } catch (e) {
+      state.threads.delete(id);         // try again next time it's opened
+      if (e.status === 401) { showLogin('Your session ended. Please log in again.'); }
+    } finally {
+      state.loading.delete(id);
+      state.threadDirty = true;
+      if (state.selected === id) { const c = selectedConv(); if (c) markRead(c); render(); }
+    }
+  }
+
+  async function select(id) {
+    state.selected = id;
+    state.closeArmed = false;
+    state.threadDirty = true;
+    $('app').classList.add('chat-open');
+    const c = selectedConv();
+    if (c) markRead(c);
+    render();
+    if (!state.threads.has(id)) await loadThread(id);
+    if (!$('composer').hidden) $('reply').focus();
+  }
+
+  function markRead(c) {
+    if (c.last && c.last.id > (state.read[c.id] || 0)) {
+      state.read[c.id] = c.last.id;
+      store.set('livechat-dash:read:' + state.agent.id, state.read);
+    }
+  }
+
+  // put a server message into a thread, replacing our own pending copy of it if there is one
+  function addToThread(thread, m) {
+    if (thread.some((x) => x.id === m.id)) return;
+    const own = m.client_id ? thread.findIndex((x) => x.id == null && x.client_id === m.client_id) : -1;
+    if (own > -1) { thread[own] = m; return; }
+    const firstUnsent = thread.findIndex((x) => x.id == null);
+    if (firstUnsent === -1) thread.push(m); else thread.splice(firstUnsent, 0, m);
+  }
+
+  // returns false when the message belongs to a conversation we haven't heard of yet
+  function handleMessage(m) {
+    const c = state.convs.get(m.conversation_id);
+    if (!c) return false;
+
+    // "known" = we already learned about this message some other way, like a thread
+    // download or our own reply. Then it isn't news, so no beep and no unread mark.
+    const known = !!c.last && m.id <= c.last.id;
+    if (!c.last || m.id > c.last.id) { c.last = m; c.last_activity_at = m.created_at; }
+    const thread = state.threads.get(c.id);
+    if (thread) { addToThread(thread, m); state.threadDirty = true; }
+
+    if (!known && m.sender === 'visitor') alertIfNeeded(c, m);
+    if (looking(c.id)) markRead(c);
+    return true;
+  }
+
+  // ---------- polling ----------
+  // The dashboard polls /agent/events, and that also tells the server you're online.
+
+  async function poll() {
+    if (state.polling || !state.agent) return;
+    state.polling = true;
+    let more = false;
+
+    try {
+      const data = await call('GET', '/agent/events?after=' + state.cursor);
+      state.errors = 0;
+      $('banner').hidden = true;
+
+      const unknown = data.messages.filter((m) => !handleMessage(m));
+      state.cursor = Math.max(state.cursor, data.next_after || 0);
+
+      if (unknown.length) {             // a visitor just started a new chat
+        await loadList('open');
+        const told = new Set();
+        for (const m of unknown) {
+          const c = state.convs.get(m.conversation_id);
+          if (c && m.sender === 'visitor' && !told.has(c.id)) { told.add(c.id); alertIfNeeded(c, m); }
+        }
+      }
+      more = data.messages.length >= 100;
+      render();
+    } catch (e) {
+      if (e.status === 401) { state.polling = false; return showLogin('Your session ended. Please log in again.'); }
+      state.errors++;
+      $('banner').hidden = false;
+    }
+
+    state.polling = false;
+    schedule(more ? 0 : undefined);
+  }
+
+  function schedule(delay) {
+    clearTimeout(state.timer);
+    if (!state.agent) return;
+    // Hidden tabs poll less often, but still well inside the 60 seconds
+    // the server allows before it decides nobody is online.
+    const base = document.hidden ? Math.min(state.interval * 4, 15000) : state.interval;
+    const wait = delay !== undefined ? delay : Math.min(30000, base * Math.pow(2, Math.min(state.errors, 4)));
+    state.timer = setTimeout(poll, wait);
+  }
+
+  function stop() { clearTimeout(state.timer); state.polling = false; }
+
+  // ---------- sending ----------
+
+  function send() {
+    const c = selectedConv();
+    const text = $('reply').value.trim();
+    const thread = c && state.threads.get(c.id);
+    if (!c || !text || c.status === 'closed' || !thread) return;
+
+    const local = { id: null, sender: 'agent', agent_id: state.agent.id, body: text, client_id: uuid(), created_at: null, pending: true };
+    thread.push(local);
+    $('reply').value = '';
+    autosize();
+    transmit(c.id, local);
+  }
+
+  async function transmit(cid, local) {
+    local.pending = true; local.failed = false;
+    state.threadDirty = true; render();
+
+    try {
+      const data = await call('POST', '/agent/conversations/' + cid + '/messages', { body: local.body, client_id: local.client_id });
+      const thread = state.threads.get(cid);
+      const i = thread ? thread.indexOf(local) : -1;
+      if (i > -1) {                     // polling may already have swapped in the real one
+        if (thread.some((x) => x.id === data.message.id)) thread.splice(i, 1); else thread[i] = data.message;
+      }
+      const c = state.convs.get(cid);
+      if (c && (!c.last || data.message.id > c.last.id)) { c.last = data.message; c.last_activity_at = data.message.created_at; }
+      if (c) markRead(c);
+    } catch (e) {
+      if (e.status === 401) return showLogin('Your session ended. Please log in again.');
+      local.pending = false; local.failed = true;     // click the bubble to retry with the same id, so it's never stored twice
+    }
+    state.threadDirty = true; render();
+  }
+
+  $('composer').addEventListener('submit', (e) => { e.preventDefault(); send(); });
+  $('reply').addEventListener('input', autosize);
+  $('reply').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+  });
+  function autosize() {
+    const t = $('reply');
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 140) + 'px';
+  }
+
+  $('closeBtn').addEventListener('click', async () => {
+    const c = selectedConv();
+    if (!c) return;
+    if (!state.closeArmed) {            // two clicks, so it can't happen by accident
+      state.closeArmed = true; state.threadDirty = true; render();
+      setTimeout(() => { state.closeArmed = false; state.threadDirty = true; render(); }, 3500);
+      return;
+    }
+    state.closeArmed = false;
+    try {
+      await call('POST', '/agent/conversations/' + c.id + '/close');
+      c.status = 'closed';
+    } catch (e) {
+      if (e.status === 401) return showLogin('Your session ended. Please log in again.');
+    }
+    state.threadDirty = true; render();
+  });
+
+  // ---------- alerts: sound, desktop notification, tab title ----------
+
+  let audio = null;
+  function ensureAudio() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === 'suspended') audio.resume();
+    } catch (e) { /* no sound, nothing breaks */ }
+  }
+  document.addEventListener('click', ensureAudio, { once: true });
+  document.addEventListener('keydown', ensureAudio, { once: true });
+
+  function beep() {
+    if (!state.sound || !audio) return;
+    try {
+      const t = audio.currentTime, osc = audio.createOscillator(), gain = audio.createGain();
+      osc.type = 'sine'; osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t); osc.stop(t + 0.4);
+    } catch (e) { /* ignore */ }
+  }
+
+  function alertIfNeeded(c, m) {
+    if (looking(c.id)) return;          // you're reading it right now
+    beep();
+    if (window.Notification && Notification.permission === 'granted' && (document.hidden || !focused())) {
+      try {
+        const n = new Notification(nameOf(c), { body: String(m.body).slice(0, 140), tag: 'livechat-' + c.id });
+        n.onclick = () => { window.focus(); select(c.id); n.close(); };
+      } catch (e) { /* some browsers only allow this from a service worker */ }
+    }
+  }
+
+  $('alertsBtn').addEventListener('click', async () => {
+    try { await Notification.requestPermission(); } catch (e) { /* ignore */ }
+    $('alertsBtn').hidden = !(window.Notification && Notification.permission === 'default');
+  });
+  $('soundBtn').addEventListener('click', () => {
+    state.sound = !state.sound;
+    store.set('livechat-dash:sound', state.sound);
+    ensureAudio();
+    if (state.sound) beep();
+    render();
+  });
+
+  // ---------- drawing ----------
+  // The list and thread only redraw when something changed. Redrawing every
+  // poll would wipe out any text you're selecting and jump the scroll position.
+
+  function render() {
+    renderList();
+    renderThread();
+    $('soundBtn').textContent = state.sound ? 'Sound on' : 'Sound off';
+    const n = [...state.convs.values()].filter((c) => c.status === 'open' && isUnread(c)).length;
+    document.title = n ? '(' + n + ') LiveChat' : 'LiveChat';
+  }
+
+  function renderList(force) {
+    const items = [...state.convs.values()]
+      .filter((c) => c.status === state.tab)
+      // timestamps are whole seconds, so two chats can tie: newest message id, then conversation id, breaks it
+      .sort((a, b) => (new Date(b.last_activity_at) - new Date(a.last_activity_at))
+        || ((b.last ? b.last.id : 0) - (a.last ? a.last.id : 0)) || (b.id - a.id));
+
+    const sig = state.tab + '|' + state.selected + '|' + items.map((c) => [c.id, c.last && c.last.id, isUnread(c)].join(':')).join(',');
+    if (!force && sig === state.listSig) return;
+    state.listSig = sig;
+
+    for (const t of ['open', 'closed']) $(t === 'open' ? 'tabOpen' : 'tabClosed').setAttribute('aria-selected', String(state.tab === t));
+
+    const ul = $('list');
+    ul.textContent = '';
+    if (!items.length) ul.appendChild(h('li', { class: 'none', text: state.tab === 'open' ? 'No open conversations yet.' : 'Nothing here.' }));
+
+    for (const c of items) {
+      const preview = c.last ? (c.last.sender === 'agent' ? 'You: ' : '') + String(c.last.body).slice(0, 120) : 'No messages yet';
+      const btn = h('button', { type: 'button', class: 'item' + (isUnread(c) ? ' unread' : '') + (c.id === state.selected ? ' sel' : '') }, [
+        h('div', { class: 'top' }, [h('span', { class: 'nm', text: nameOf(c) }), h('span', { class: 'tm', text: ago(c.last_activity_at) })]),
+        h('div', { class: 'pv', text: preview }),
+      ]);
+      btn.addEventListener('click', () => select(c.id));
+      ul.appendChild(h('li', {}, [btn]));
+    }
+  }
+
+  function infoLine(c) {
+    const box = $('tinfo');
+    box.textContent = '';
+    const parts = [];
+    if (c.visitor.email) parts.push(document.createTextNode(c.visitor.email));
+    if (c.visitor.page_url) {
+      try {
+        const u = new URL(c.visitor.page_url);
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          parts.push(h('a', { href: u.href, target: '_blank', rel: 'noopener noreferrer', text: (u.host + u.pathname).slice(0, 50) }));
+        }
+      } catch (e) { /* not a URL, skip it */ }
+    }
+    parts.push(document.createTextNode('started ' + new Date(c.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })));
+    parts.forEach((p, i) => { if (i) box.appendChild(document.createTextNode(' \u00b7 ')); box.appendChild(p); });
+  }
+
+  function renderThread() {
+    const c = selectedConv();
+    $('empty').hidden = !!c;
+    $('chat').hidden = !c;
+    if (!c) return;
+
+    const switched = state.shownFor !== c.id;
+    if (!state.threadDirty && !switched) return;
+    state.threadDirty = false;
+    state.shownFor = c.id;
+
+    $('tname').textContent = nameOf(c);
+    infoLine(c);
+    const closed = c.status === 'closed';
+    $('composer').hidden = closed;
+    $('closedNote').hidden = !closed;
+    $('closeBtn').hidden = closed;
+    $('closeBtn').textContent = state.closeArmed ? 'Click again to close' : 'Close conversation';
+
+    const box = $('msgs');
+    const pinned = switched || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+    box.textContent = '';
+
+    const thread = state.threads.get(c.id);
+    if (!thread) box.appendChild(h('div', { class: 'note', text: 'Loading\u2026' }));
+    else if (!thread.length) box.appendChild(h('div', { class: 'note', text: 'No messages yet.' }));
+    else for (const m of thread) box.appendChild(messageRow(c, m));
+
+    if (pinned) box.scrollTop = box.scrollHeight;
+  }
+
+  function messageRow(c, m) {
+    const mine = m.sender === 'agent' && m.agent_id === state.agent.id;
+    const label = m.sender === 'agent' ? (mine ? 'You' : 'Teammate') : nameOf(c);
+    const meta = m.failed ? 'Not sent. Click to retry.' : m.pending ? 'Sending\u2026' : label + ' \u00b7 ' + clock(m.created_at);
+    const row = h('div', { class: 'row ' + m.sender + (m.pending ? ' pending' : '') + (m.failed ? ' failed' : '') }, [
+      h('div', { class: 'bubble', text: m.body }),
+      h('div', { class: 'meta', text: meta }),
+    ]);
+    if (m.failed) row.addEventListener('click', () => transmit(c.id, m));
+    return row;
+  }
+
+  for (const btn of document.querySelectorAll('.tabs button')) {
+    btn.addEventListener('click', () => {
+      state.tab = btn.dataset.tab;
+      if (state.tab === 'closed') loadList('closed').then(() => renderList(true), () => {});
+      renderList(true);
+    });
+  }
+  $('back').addEventListener('click', () => $('app').classList.remove('chat-open'));
+
+  // coming back to the tab: catch up now, and count what you're looking at as read
+  function seen() {
+    const c = selectedConv();
+    if (state.agent && c && looking(c.id)) { markRead(c); render(); }
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!state.agent) return;
+    if (document.hidden) schedule(); else { poll(); seen(); }
+  });
+  window.addEventListener('focus', seen);
+  setInterval(() => { if (state.agent) renderList(true); }, 30000);    // keeps "5m" labels fresh
+
+  // ---------- start ----------
+
+  (async function boot() {
+    try {
+      state.api = await detectApi();
+    } catch (e) {
+      return showLogin('Could not find the LiveChat server (api.php). Check that this folder is in the right place.');
+    }
+    state.auth = state.api.replace(/api\.php$/, 'auth.php');
+    try { await begin(await call('GET', '/me', null, state.auth)); }
+    catch (e) { showLogin(''); }        // not logged in (or the session expired)
+  })();
+})();
+</script>
+</body>
+</html>

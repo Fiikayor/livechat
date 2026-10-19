@@ -136,6 +136,30 @@ final class PdoStorage implements StorageInterface
         return array_map([$this, 'toMessage'], $rows);
     }
 
+    public function lastMessages(array $conversationIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $conversationIds)));
+        if (!$ids) {
+            return [];
+        }
+
+        // newest message id per conversation, then fetch exactly those rows.
+        // $marks is only ever "?,?,?", the ids themselves are bound as values.
+        $marks = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $this->run(
+            "SELECT * FROM messages WHERE id IN (
+                SELECT MAX(id) FROM messages WHERE conversation_id IN ($marks) GROUP BY conversation_id
+            )",
+            $ids
+        )->fetchAll();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(int) $row['conversation_id']] = $this->toMessage($row);
+        }
+        return $out;
+    }
+
     // ---------- agents ----------
 
     public function findAgent(int $id): ?Agent

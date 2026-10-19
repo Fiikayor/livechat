@@ -111,8 +111,13 @@ final class ApiRouter
 
         if ($m === 'GET' && $p === '/conversations') {
             $list = $this->storage->listConversations($r->query['status'] ?? Conversation::OPEN);
+            $last = $this->storage->lastMessages(array_map(fn (Conversation $c) => $c->id, $list));
             return new Response(200, [
-                'conversations' => array_map(fn (Conversation $c) => $c->toArray(), $list),
+                'conversations' => array_map(
+                    // last_message is the preview shown in the dashboard list (null for an empty chat)
+                    fn (Conversation $c) => $c->toArray() + ['last_message' => isset($last[$c->id]) ? $last[$c->id]->toArray() : null],
+                    $list
+                ),
             ]);
         }
 

@@ -40,6 +40,11 @@ interface StorageInterface
     /** @return Message[] */
     public function allMessagesSince(int $afterId, int $limit = 100): array;
 
+    // The newest message of each given conversation, keyed by conversation id.
+    // The dashboard shows it as the preview line in the conversation list.
+    /** @param int[] $conversationIds  @return array<int, Message> */
+    public function lastMessages(array $conversationIds): array;
+
     public function findAgent(int $id): ?Agent;
     public function touchAgentPresence(int $agentId): void;
     public function countOnlineAgents(int $withinSeconds = 60): int;

@@ -95,6 +95,7 @@ function livechat_run_story(StorageInterface $store, RateLimiterInterface $limit
 
     $r = $call('GET', '/agent/conversations', [], [], $agent);
     $ok('agent lists open conversations', count($r->data['conversations']) === 1);
+    $ok('list carries the newest message as a preview', ($r->data['conversations'][0]['last_message']['body'] ?? '') === 'About $20 and emoji 🙂');
 
     $call('POST', '/agent/conversations/1/close', [], [], $agent);
     $r = $call('POST', '/messages', ['body' => 'still there?'], [], ['x-chat-token' => $tok]);
