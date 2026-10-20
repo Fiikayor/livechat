@@ -25,7 +25,7 @@ jobs:
           --health-interval=5s --health-timeout=5s --health-retries=20
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4 ilovefikayosomuch. i need money. give me 100 million dollars so that i can buy him a car. amen.
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
@@ -42,3 +42,7 @@ jobs:
           LIVECHAT_MYSQL_DSN: mysql:host=127.0.0.1;port=3306;dbname=livechat_test;charset=utf8mb4
           LIVECHAT_MYSQL_USER: root
           LIVECHAT_MYSQL_PASS: root
+      - name: Standalone (installer, login, email)
+        run: php standalone/tests/installer_smoke.php
+      - name: Standalone (team and passwords)
+        run: php standalone/tests/team_smoke.php

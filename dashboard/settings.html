@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LiveChat settings</title>
+<style>
+    :root { color-scheme: light dark; --bg:#fff; --panel:#f8fafc; --fg:#0f172a; --muted:#64748b; --line:#e2e8f0;
+            --accent:#2563eb; --on:#fff; --alert:#dc2626; --good:#16a34a; }
+    @media (prefers-color-scheme: dark) {
+        :root { --bg:#0f172a; --panel:#111c33; --fg:#e2e8f0; --muted:#94a3b8; --line:#243049; }
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); }
+    button, a.ghost { font: inherit; color: inherit; cursor: pointer; }
+    input, textarea, select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+    input[type=color] { padding: 2px; height: 38px; width: 64px; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+    .primary { background: var(--accent); color: var(--on); border: 0; border-radius: 8px; padding: 9px 16px; font-weight: 600; }
+    .primary:disabled { opacity: .5; cursor: not-allowed; }
+    .ghost { display: inline-block; background: none; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; font-size: 13px; text-decoration: none; }
+    .danger { color: var(--alert); border-color: var(--alert); }
+
+    header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+    header .spacer { flex: 1; } header #who { color: var(--muted); font-size: 14px; }
+    main { max-width: 760px; margin: 0 auto; padding: 8px 16px 64px; }
+    section { margin-top: 28px; padding-top: 4px; }
+    h2 { font-size: 18px; margin: 0 0 4px; }
+    .lead { margin: 0 0 14px; color: var(--muted); }
+    label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 14px; }
+    label small { font-weight: 400; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 14px; }
+    .stack { display: flex; flex-direction: column; gap: 12px; max-width: 420px; }
+    pre { margin: 0; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .row { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+    .msg { min-height: 1.4em; font-size: 14px; } .msg.err { color: var(--alert); } .msg.good { color: var(--good); }
+    .note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+    th { font-size: 13px; color: var(--muted); font-weight: 600; }
+    td.actions { text-align: right; white-space: nowrap; }
+    .badge { font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+    .pwrow td { background: var(--panel); }
+    .pwrow .inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .pwrow input { max-width: 260px; }
+    #gate { max-width: 420px; margin: 20vh auto; padding: 0 16px; text-align: center; }
+</style>
+</head>
+<body>
+
+<div id="gate" hidden>
+    <h1>Please log in first</h1>
+    <p id="gateMsg">You need to be logged in to change settings.</p>
+    <p><a class="ghost" href="./">Go to the login page</a></p>
+</div>
+
+<div id="page" hidden>
+    <header>
+        <a class="ghost" href="./">&larr; Back to chats</a>
+        <strong>Settings</strong>
+        <span class="spacer"></span>
+        <span id="who"></span>
+    </header>
+
+    <main>
+        <section id="embed">
+            <h2>Put the chat on your website</h2>
+            <p class="lead">Choose how it looks, then copy the code below and paste it into your website just before the closing <code>&lt;/body&gt;</code> tag.</p>
+            <div class="grid">
+                <label>Color <input type="color" id="optColor" value="#2563eb"></label>
+                <label>Position
+                    <select id="optSide"><option value="right">Bottom right</option><option value="left">Bottom left</option></select>
+                </label>
+                <label>Title <input type="text" id="optTitle" maxlength="60" value="Chat with us"></label>
+                <label>First message <input type="text" id="optGreeting" maxlength="200" value="Hi! How can we help?"></label>
+            </div>
+            <pre id="snippet" tabindex="0"></pre>
+            <div class="row">
+                <button type="button" id="copyBtn" class="primary">Copy code</button>
+                <span id="copyMsg" class="msg" role="status"></span>
+            </div>
+            <p class="note" id="embedNote"></p>
+        </section>
+
+        <section id="account">
+            <h2>Your account</h2>
+            <p class="lead" id="accountLine"></p>
+            <form id="pwForm" class="stack" autocomplete="off">
+                <label>Current password <input type="password" id="pwCurrent" required autocomplete="current-password"></label>
+                <label>New password <small>At least 10 characters.</small>
+                    <input type="password" id="pwNew" required minlength="10" autocomplete="new-password"></label>
+                <label>Repeat new password <input type="password" id="pwNew2" required minlength="10" autocomplete="new-password"></label>
+                <div id="pwMsg" class="msg" role="status"></div>
+                <div><button type="submit" class="primary" id="pwBtn">Change password</button></div>
+            </form>
+        </section>
+
+        <section id="team" hidden>
+            <h2>Your team</h2>
+            <p class="lead">People who can log in and answer chats. Only you can add or remove them.</p>
+            <table>
+                <thead><tr><th>Name</th><th>Email</th><th></th></tr></thead>
+                <tbody id="teamRows"></tbody>
+            </table>
+            <h3 style="font-size:16px;margin:0 0 8px">Add someone</h3>
+            <form id="addForm" class="stack" autocomplete="off">
+                <label>Name <input type="text" id="addName" required maxlength="100"></label>
+                <label>Email <input type="email" id="addEmail" required autocomplete="off"></label>
+                <label>Password <small>At least 10 characters. Tell them, and they can change it after logging in.</small>
+                    <input type="text" id="addPw" required minlength="10" autocomplete="off"></label>
+                <div id="addMsg" class="msg" role="status"></div>
+                <div><button type="submit" class="primary" id="addBtn">Add teammate</button></div>
+            </form>
+        </section>
+    </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const state = { api: '', auth: '', csrf: '', me: null };
+
+  function h(tag, props, kids) {
+    const e = document.createElement(tag);
+    for (const k of Object.keys(props || {})) {
+      if (k === 'class') e.className = props[k];
+      else if (k === 'text') e.textContent = props[k];     // always textContent, never innerHTML
+      else e.setAttribute(k, props[k]);
+    }
+    for (const c of kids || []) e.appendChild(c);
+    return e;
+  }
+
+  // ---------- talking to the server ----------
+
+  async function call(method, path, body, base) {
+    const opts = { method, credentials: 'same-origin', headers: {} };
+    if (method !== 'GET' && state.csrf) opts.headers['X-CSRF-Token'] = state.csrf;
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    const res = await fetch((base || state.api) + path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error((data.error && data.error.message) || 'Request failed');
+      err.status = res.status;
+      err.code = data.error && data.error.code;
+      throw err;
+    }
+    return data;
+  }
+
+  async function detectApi() {
+    for (const rel of ['../api.php', '../standalone/api.php']) {
+      const url = new URL(rel, location.href).href;
+      try {
+        const res = await fetch(url + '/config');
+        const data = res.ok ? await res.json() : null;
+        if (data && data.transport) return url;
+      } catch (e) { /* try the next one */ }
+    }
+    throw new Error('api.php not found');
+  }
+
+  function say(el, text, kind) {
+    el.textContent = text;
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  // the session ended while this page was open
+  function gate(message) {
+    $('page').hidden = true;
+    $('gate').hidden = false;
+    if (message) $('gateMsg').textContent = message;
+  }
+
+  // ---------- 1. the embed code ----------
+
+  // Values go inside an HTML attribute, so quotes and angle brackets must be escaped
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function buildSnippet() {
+    const widget = new URL('../widget/livechat.js', location.href).href;
+    const attrs = ['src="' + esc(widget) + '"', 'data-api="' + esc(state.api) + '"'];
+
+    // only write the options the owner actually changed, so the code stays short
+    const color = $('optColor').value;
+    const title = $('optTitle').value.trim();
+    const greeting = $('optGreeting').value.trim();
+    if (color && color.toLowerCase() !== '#2563eb') attrs.push('data-color="' + esc(color) + '"');
+    if (title && title !== 'Chat with us') attrs.push('data-title="' + esc(title) + '"');
+    if (greeting && greeting !== 'Hi! How can we help?') attrs.push('data-greeting="' + esc(greeting) + '"');
+    if ($('optSide').value === 'left') attrs.push('data-position="left"');
+    attrs.push('defer');
+
+    // "</" + "script>" written in two pieces: the browser would otherwise end THIS script right here
+    return '<script ' + attrs.join(' ') + '></' + 'script>';
+  }
+
+  function showSnippet() {
+    $('snippet').textContent = buildSnippet();
+    say($('copyMsg'), '');
+  }
+
+  async function copySnippet() {
+    const text = $('snippet').textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {                                   // older browsers, or not allowed
+      const range = document.createRange();
+      range.selectNodeContents($('snippet'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      try { document.execCommand('copy'); } catch (e2) { return say($('copyMsg'), 'Select the code above and copy it yourself.', 'err'); }
+    }
+    say($('copyMsg'), 'Copied!', 'good');
+  }
+
+  async function embedNote() {
+    const widget = new URL('../widget/livechat.js', location.href);
+    let found = true;
+    try { found = (await fetch(widget.href, { method: 'HEAD' })).ok; } catch (e) { found = true; }   // can't tell, don't worry them
+    const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+    const parts = [];
+    if (!found) parts.push('Heads up: the chat file was not found at ' + widget.pathname + '. Check that the widget folder was uploaded.');
+    if (local) parts.push('You opened this page on your own computer, so the code points at localhost. Open this settings page on your real website address to get code with the right address.');
+    $('embedNote').textContent = parts.join(' ');
+  }
+
+  for (const id of ['optColor', 'optSide', 'optTitle', 'optGreeting']) $(id).addEventListener('input', showSnippet);
+  $('copyBtn').addEventListener('click', copySnippet);
+
+  // ---------- 2. your password ----------
+
+  $('pwForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if ($('pwNew').value !== $('pwNew2').value) return say($('pwMsg'), 'The two new passwords do not match.', 'err');
+    $('pwBtn').disabled = true;
+    try {
+      await call('POST', '/password', { current: $('pwCurrent').value, new: $('pwNew').value }, state.auth);
+      $('pwForm').reset();
+      say($('pwMsg'), 'Password changed.', 'good');
+    } catch (err) {
+      if (err.status === 401) return gate('Your session ended. Please log in again.');
+      say($('pwMsg'), err.status ? err.message : 'Could not reach the server.', 'err');
+    }
+    $('pwBtn').disabled = false;
+  });
+
+  // ---------- 3. the team (admin only) ----------
+
+  async function loadTeam() {
+    const data = await call('GET', '/agents', null, state.auth);
+    const body = $('teamRows');
+    body.textContent = '';
+
+    for (const a of data.agents) {
+      const actions = h('td', { class: 'actions' });
+      const row = h('tr', {}, [
+        h('td', { text: a.name }),
+        h('td', { text: a.email }),
+        actions,
+      ]);
+      if (a.is_admin) {
+        row.children[0].appendChild(document.createTextNode(' '));
+        row.children[0].appendChild(h('span', { class: 'badge', text: a.id === state.me.id ? 'You, admin' : 'Admin' }));
+      } else {
+        const pwBtn = h('button', { type: 'button', class: 'ghost', text: 'New password' });
+        const rmBtn = h('button', { type: 'button', class: 'ghost danger', text: 'Remove' });
+        actions.appendChild(pwBtn);
+        actions.appendChild(document.createTextNode(' '));
+        actions.appendChild(rmBtn);
+        pwBtn.addEventListener('click', () => togglePasswordRow(row, a));
+        rmBtn.addEventListener('click', () => removeTeammate(rmBtn, a));
+      }
+      body.appendChild(row);
+    }
+  }
+
+  // a small extra row under the person, to type a new password into
+  function togglePasswordRow(row, agent) {
+    if (row.nextSibling && row.nextSibling.classList && row.nextSibling.classList.contains('pwrow')) {
+      row.nextSibling.remove();
+      return;
+    }
+    const input = h('input', { type: 'text', placeholder: 'New password (10+ characters)', 'aria-label': 'New password for ' + agent.name, autocomplete: 'off' });
+    const save = h('button', { type: 'button', class: 'primary', text: 'Save' });
+    const msg = h('span', { class: 'msg', role: 'status' });
+    save.addEventListener('click', async () => {
+      try {
+        await call('POST', '/agents/' + agent.id + '/password', { password: input.value }, state.auth);
+        say(msg, 'Saved. Tell ' + agent.name + ' the new password.', 'good');
+        input.value = '';
+      } catch (err) {
+        if (err.status === 401) return gate('Your session ended. Please log in again.');
+        say(msg, err.message, 'err');
+      }
+    });
+    const cell = h('td', { colspan: '3' }, [h('div', { class: 'inline' }, [input, save, msg])]);
+    row.parentNode.insertBefore(h('tr', { class: 'pwrow' }, [cell]), row.nextSibling);
+    input.focus();
+  }
+
+  function removeTeammate(btn, agent) {
+    if (btn.dataset.armed !== '1') {                    // two clicks, so it can't happen by accident
+      btn.dataset.armed = '1';
+      btn.textContent = 'Click again to remove';
+      setTimeout(() => { btn.dataset.armed = ''; btn.textContent = 'Remove'; }, 3500);
+      return;
+    }
+    call('POST', '/agents/' + agent.id + '/delete', null, state.auth)
+      .then(loadTeam)
+      .catch((err) => {
+        if (err.status === 401) return gate('Your session ended. Please log in again.');
+        say($('addMsg'), err.message, 'err');
+      });
+  }
+
+  $('addForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('addBtn').disabled = true;
+    try {
+      await call('POST', '/agents', { name: $('addName').value, email: $('addEmail').value, password: $('addPw').value }, state.auth);
+      say($('addMsg'), $('addName').value.trim() + ' can now log in.', 'good');
+      $('addForm').reset();
+      await loadTeam();
+    } catch (err) {
+      if (err.status === 401) return gate('Your session ended. Please log in again.');
+      say($('addMsg'), err.status ? err.message : 'Could not reach the server.', 'err');
+    }
+    $('addBtn').disabled = false;
+  });
+
+  // ---------- start ----------
+
+  (async function boot() {
+    try {
+      state.api = await detectApi();
+    } catch (e) {
+      return gate('Could not find the LiveChat server (api.php). Check that this folder is in the right place.');
+    }
+    state.auth = state.api.replace(/api\.php$/, 'auth.php');
+
+    try {
+      const me = await call('GET', '/me', null, state.auth);
+      state.me = me.agent; state.csrf = me.csrf;
+    } catch (e) {
+      return gate();
+    }
+
+    $('who').textContent = state.me.name;
+    $('accountLine').textContent = 'Signed in as ' + state.me.name + ' (' + state.me.email + ').';
+    $('page').hidden = false;
+    showSnippet();
+    embedNote();
+
+    if (state.me.is_admin) {
+      $('team').hidden = false;
+      try { await loadTeam(); } catch (e) { say($('addMsg'), 'Could not load the team.', 'err'); }
+    }
+  })();
+})();
+</script>
+</body>
+</html>

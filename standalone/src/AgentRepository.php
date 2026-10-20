@@ -31,12 +31,20 @@ final class AgentRepository
         return (int) $this->pdo->lastInsertId();
     }
 
-    // PHP raises the default hashing cost over time, so upgrade old hashes at login.
+    // Used both to upgrade old hashes at login (PHP raises the default cost over
+    // time) and when somebody changes or resets a password.
     public function updateHash(int $id, string $password): void
     {
         $this->pdo
             ->prepare('UPDATE agents SET password_hash = ? WHERE id = ?')
             ->execute([password_hash($password, PASSWORD_DEFAULT), $id]);
+    }
+
+    // Chats they were assigned to simply become unassigned (the database does
+    // that for us), and their old messages stay in the history.
+    public function delete(int $id): void
+    {
+        $this->pdo->prepare('DELETE FROM agents WHERE id = ?')->execute([$id]);
     }
 
     private static function normalize(string $email): string

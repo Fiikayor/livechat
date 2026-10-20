@@ -460,7 +460,8 @@
   // ---------- opening and closing ----------
 
   function greet() {
-    bubble({ sender: 'agent', body: cfg.greeting });
+    // the greeting isn't a real message, so it gets no time line under it
+    bubble({ sender: 'agent', body: cfg.greeting }).lastChild.remove();
   }
 
   function loadConfig() {
