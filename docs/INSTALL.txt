@@ -1,0 +1,143 @@
+LiveChat {{VERSION}}
+====================
+
+A live chat you run on your own website. Visitors click the chat bubble,
+you get notified and answer from your browser. The conversations are stored
+on your own server, not on somebody else's.
+
+This is an early (0.x) release. It works, but read "Known limits" at the
+bottom before you rely on it.
+
+
+WHAT YOU NEED
+-------------
+ * A website with PHP 8.1 or newer. Nearly every host has this. If yours
+   offers a PHP version picker (cPanel: "Select PHP Version"), choose 8.1+.
+ * Nothing else. By default LiveChat keeps its data in a single file (SQLite).
+   You can use a MySQL database instead if you prefer.
+ * About 10 minutes.
+
+
+INSTALL
+-------
+ 1. Upload this whole "livechat" folder to your website, next to your pages
+    (for example into "public_html"), using FTP or your host's File Manager.
+    You should end up with:   https://yourwebsite.com/livechat/
+
+ 2. Make the folder "livechat/storage" writable. In File Manager or your FTP
+    program, set its permissions to 755. If the setup page then says the
+    folder is not writable, set it to 775, and as a last resort 777. Only
+    that one folder needs this.
+
+ 3. Open   https://yourwebsite.com/livechat/install.php   in your browser.
+    The "Server check" at the top should be all green. Keep SQLite selected,
+    enter your name, your email and a password (at least 10 characters),
+    leave "Send real emails" selected, and click Install.
+
+ 4. Log in at   https://yourwebsite.com/livechat/dashboard/
+
+ 5. Click "Settings" in the dashboard. Pick a color and a title, click
+    "Copy code", and paste that one line into your website's pages just
+    before the closing </body> tag. If your site has a shared footer or
+    template, paste it there once.
+
+ 6. Test it. Open your website in a private/incognito window, click the chat
+    bubble and write a message. It should appear in your dashboard within a
+    few seconds, with a sound. Answer it, and the reply appears for the
+    visitor.
+
+You can delete "install.php" afterwards. It switches itself off once the
+setup is done, so this is optional.
+
+
+HOW IT WORKS
+------------
+ * While your dashboard is open in a browser tab, you count as "online" and
+   visitors can chat with you.
+ * When nobody has the dashboard open, visitors see a "leave a message" form
+   instead. Those messages are emailed to you.
+ * You also get an email when a visitor writes to you (at most one email per
+   conversation every 5 minutes).
+ * Keep the dashboard tab visible while you work. Browsers slow down hidden
+   tabs a lot after a few minutes, and visitors could be told you're offline.
+ * Settings lets you change your password and (as the admin) add teammates.
+
+
+HTTPS
+-----
+Please use https:// for your website. Your login and the chats travel over
+the connection, and without HTTPS they can be read by others on the network.
+Most hosts give you a free certificate (Let's Encrypt).
+
+
+EMAIL
+-----
+LiveChat sends mail with PHP's built-in mail(), which is what shared hosting
+provides. If emails don't arrive, check your spam folder first. On a computer
+at home mail() usually doesn't work at all: choose "Write to a log file" in
+the installer, and the emails appear in livechat/storage/mail.log instead.
+To switch later, open livechat/storage/config.php and change
+'driver' => 'mail'  to  'driver' => 'log'  (or back).
+
+
+BACKUP, UPGRADE, UNINSTALL
+--------------------------
+ * Backup: copy the "livechat/storage" folder. It holds your database,
+   your settings and the mail log. Treat it as private.
+ * Upgrade: upload the new version over the old one, but do NOT overwrite
+   or delete "storage". There is no automatic database upgrade yet, so in
+   0.x releases a new version can occasionally need a fresh install. The
+   release notes will say so.
+ * Uninstall: delete the "livechat" folder (and the one line you pasted
+   into your pages).
+
+
+IF SOMETHING GOES WRONG
+-----------------------
+ * "The livechat folder is not writable" on the setup page:
+   change the permissions of "storage" as described in step 2.
+
+ * A blank white page, or an error 500: your PHP version is probably too old.
+   Check that it is 8.1 or newer.
+
+ * The chat bubble doesn't appear: make sure the line you pasted is on the
+   page, and open https://yourwebsite.com/livechat/api.php/config in your
+   browser. It should show a little text starting with {"transport": ...
+   If it shows "not found" or an error, tell me (see the project page) which
+   host you use. Some servers need an extra setting for this address.
+
+ * You forgot your password: there is no "forgot password" email yet. The
+   password can only be reset by editing the database. Keep it somewhere safe.
+
+ * Using nginx instead of Apache? Apache hides the private folders using the
+   ".htaccess" files that come with LiveChat. nginx ignores those files, so
+   add this to your server config (adjust the path if you used another folder):
+
+       location ~ ^/livechat/(storage|src|core|schema)/ { deny all; }
+
+
+PRIVACY
+-------
+LiveChat stores what visitors write, the name and email they choose to give,
+and the page they were on. It also keeps visitors' IP addresses for a while
+in a table used to stop spam. If your visitors are in the EU or UK, mention
+chat in your privacy policy.
+
+
+KNOWN LIMITS (0.x)
+------------------
+ * Use it on the same website where you installed it. Showing the chat on a
+   different domain than the one hosting the livechat folder doesn't work yet.
+ * Websites behind Cloudflare or another proxy are not supported yet. All
+   visitors would look like one person, and the spam protection would treat
+   them as one. A setting for this is planned.
+ * No "forgot password" email, no automatic upgrades, no file uploads, no
+   typing indicator.
+ * The conversation lists show the 50 newest chats.
+ * Messages arrive within about 3 seconds (the page checks for news), not
+   instantly.
+
+
+LICENSE
+-------
+See the file LICENSE in this folder.

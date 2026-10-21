@@ -1,60 +1,96 @@
-# LiveChat: self-hosted chat for any site
+# LiveChat
 
 ![tests](../../actions/workflows/tests.yml/badge.svg)
 
-> **Status: early development.** The framework-agnostic core and API contract are done and tested.
-> Widget, dashboard, standalone installer and Laravel package are in progress. See the roadmap below.
+A live chat you run on your own website. Visitors click a chat bubble, you answer from your browser, and the
+conversations stay on your own server: no monthly fee, no third-party service.
 
-A self-hosted live-chat system you own: no monthly fees, no third-party servers, customer conversations stay in
-your database. Runs on cheap shared PHP hosting (standalone) or drops into a Laravel app (Composer package).
+> **Status: early (0.x).** It works end to end, but read the known limits below before relying on it.
+
+## Install it on your website
+
+1. Download **`livechat-<version>.zip`** from the [Releases](../../releases) page and unzip it.
+2. Upload the `livechat` folder to your website with FTP or your host's File Manager.
+3. Open `https://yourwebsite.com/livechat/install.php` and fill in the form.
+
+The folder contains `README.txt` with the full step-by-step guide, written for people who don't code.
+You need PHP 8.1 or newer. SQLite is the default, so no database setup is needed.
+
+## What's in it
+
+- **A chat widget**: one `<script>` line on your pages, in its own shadow DOM so your site's CSS can't break it.
+- **An agent dashboard**: live conversation list, unread markers, sound and desktop alerts, replies, closing chats.
+- **A settings page**: copy-and-paste embed code with your colors, change your password, add teammates.
+- **Email**: you're emailed when someone writes, and visitors can leave a message when nobody is online.
+- **Safety basics**: hashed passwords, login lockout, CSRF protection, spam rate limits, and messages are always
+  shown as plain text, never as HTML.
+
+## Known limits
+
+- Use it on the same website where it's installed (no cross-domain embedding yet).
+- Not supported yet behind Cloudflare or another proxy (spam protection would treat all visitors as one).
+- No "forgot password" email, no automatic upgrades, no file uploads, no typing indicator.
+- Messages arrive within about 3 seconds (polling), not instantly.
+
+## For developers
+
+The project is built in layers so the same chat logic can run in a plain-PHP install today and in Laravel later:
 
 ```
-livechat/
-├── core/                 PURE PHP 8.1+. No framework, no DB code. This is the product.
-│   ├── src/Contracts/    The 5 seams: Storage, Notifier, Transport, AgentAuthenticator, RateLimiter
-│   ├── src/Domain/       Conversation, Message, Agent (plain value objects)
-│   ├── src/Service/      ChatService (all business rules) + PollingTransport
-│   ├── src/Http/         Request / Response / ApiRouter: the API, written once, framework-agnostic
-│   ├── src/Support/      Token, Str (mbstring-free), ChatException
-│   └── tests/smoke.php   End-to-end flow against in-memory fakes:  php core/tests/smoke.php
-├── docs/api.md           The JSON contract the widget + dashboard are built against
-├── widget/               (todo) vanilla-JS embed script, prebuilt output committed
-├── dashboard/            (todo) prebuilt agent UI, prebuilt output committed
-├── standalone/           (todo) installer, PdoStorage, MailNotifier, bootstrap.php. See api.php.example
-└── laravel/              (todo) service provider, migrations, EloquentStorage. See LiveChatController.php.example
+core/        Framework-free chat logic: rules, the JSON API, and the interfaces it needs from the outside.
+standalone/  The upload-and-install version: PDO storage (SQLite/MySQL), login, email, installer.
+widget/      The embeddable chat bubble (one JavaScript file).
+dashboard/   The agent dashboard and settings page (plain HTML files).
+bin/         build-release.php, which assembles the folder you upload.
+docs/        The JSON API contract and the install guide that ships with releases.
+laravel/     (planned) A Composer package around the same core.
 ```
 
-## The rule that keeps this portable
-`core/` may only `use` things inside `core/` and PHP built-ins. If you ever type `Illuminate\`, `PDO` or `mail(` inside
-`core/src`, move it behind an interface instead. A wrapper is "done" when it only does two jobs:
-(1) implement the 5 interfaces, (2) turn its native request into `LiveChat\Core\Http\Request`.
+Try it on your own machine, from the project folder:
 
-## What each wrapper must implement
-| Interface | Standalone | Laravel |
-|---|---|---|
-| StorageInterface | `PdoStorage` (SQLite default, MySQL optional) | `EloquentStorage` |
-| NotifierInterface | `mail()` / PHPMailer | Mail + Notification (queued) |
-| TransportInterface | `PollingTransport` | Polling by default; `ReverbTransport` optional |
-| AgentAuthenticatorInterface | own login + session | `Auth::user()` + a gate |
-| RateLimiterInterface | DB/file counter | `RateLimiter` facade |
+```bash
+php -S localhost:8081
+# installer:  http://localhost:8081/standalone/install.php   (choose "Write to a log file" for email)
+# dashboard:  http://localhost:8081/dashboard/
+# demo page:  http://localhost:8081/widget/demo.html
+```
 
-## Suggested next steps
-1. `standalone/PdoStorage.php` + `schema.sql` (conversations, messages, agents, rate_limits). Run it against the same
-   expectations as `smoke.php` so it's proven equivalent to the in-memory fake.
-2. Widget (polling loop using `GET /messages?after=`).
-3. Dashboard + email notifications.
-4. Installer wizard.
-5. Laravel wrapper (should take about a day if the core held its line).
+Run the tests (they need PHP 8.1+ with `pdo_sqlite`; the MySQL one also needs a database, see its header):
+
+```bash
+php core/tests/smoke.php
+php standalone/tests/pdo_smoke.php
+php standalone/tests/installer_smoke.php
+php standalone/tests/team_smoke.php
+php standalone/tests/release_smoke.php
+```
+
+Build the upload folder:
+
+```bash
+php bin/build-release.php --version=0.1.0 --zip     # writes dist/livechat/ and dist/livechat-0.1.0.zip
+```
+
+Publish a release: tag a commit with a version and push the tag. GitHub then runs the tests, builds the zip and
+attaches it to a new release automatically.
+
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
+
+(In GitHub Desktop: History tab, right-click the commit, **Create Tag**, then **Push origin**.)
 
 ## Roadmap
-- [x] Core: domain, interfaces, ChatService, API router
-- [x] API contract (`docs/api.md`)
-- [ ] `standalone/` PdoStorage + SQLite schema
-- [ ] Widget (polling)
-- [ ] Agent dashboard + email notifications
-- [ ] Web installer
-- [ ] Laravel package
-- [ ] Optional WebSocket/Reverb transport, Web Push
 
-## Contributing
-Run the tests with `php core/tests/smoke.php`. Keep `core/` free of framework and database code (see above).
+- [x] Framework-free core and JSON API
+- [x] SQLite and MySQL storage, web installer
+- [x] Chat widget, agent dashboard, settings page, teammates
+- [x] One-folder release, built and published automatically
+- [ ] Testing on real shared hosting
+- [ ] Cross-domain embedding, proxy/Cloudflare support, password recovery
+- [ ] Laravel package
+- [ ] Optional instant delivery (WebSockets) and browser push notifications
+
+## License
+
+MIT, see [LICENSE](LICENSE).
