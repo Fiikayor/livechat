@@ -46,3 +46,5 @@ jobs:
         run: php standalone/tests/installer_smoke.php
       - name: Standalone (team and passwords)
         run: php standalone/tests/team_smoke.php
+      - name: Release build
+        run: php standalone/tests/release_smoke.php
